@@ -1,13 +1,17 @@
 # pam_havebeenpwned
 
-This PAM security module integrates the IHaveBeenPwned API written by
+This PAM security module integrates the [IHaveBeenPwned API]
+(https://haveibeenpwned.com/)  written by
 @Troy Hunt into PAM. Every time a user types a new password, a call to
 the API is made. If the password has been pwned, the module
-returns PAM_AUTHOK_ERROR and the password is not changed.
+returns **PAM_AUTHOK_ERROR** and the password is not changed.
+
+This module leverages their [**K-Anonymity password database**]
+(https://www.troyhunt.com/ive-just-launched-pwned-passwords-version-2/#cloudflareprivacyandkanonymity)
 
 # Build & Install
 
-* Install the pre-requisites first:
+* Install the **pre-requisites** first:
 
 	apt-get install libssl-dev libcurl4-openssl-dev libpam-dev
 
@@ -21,7 +25,7 @@ returns PAM_AUTHOK_ERROR and the password is not changed.
 
 	su -c "make install"
 
-* Edit /etc/pam.d/common-passwd and add the following line BEFORE the
+* Edit **/etc/pam.d/common-passwd** and add the following line BEFORE the
   first pam_unix.so entry:
 
 	password requisite pam_havebeenpwned.so [options]
@@ -41,4 +45,8 @@ returns PAM_AUTHOK_ERROR and the password is not changed.
 	EXAMPLE:
 	
 	password requisite pam_havebeenpwned.so minlen=8 debug
+
+# Demonstration
+
+![Screenshot](screenshot.png)
 
