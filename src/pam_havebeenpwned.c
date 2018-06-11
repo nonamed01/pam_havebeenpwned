@@ -198,7 +198,11 @@ PAM_EXTERN int pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const c
 		// Generate the SHA1 of this new password.
 		memset(buf, 0x0, SHA_DIGEST_LENGTH*2);
 		memset(temp, 0x0, SHA_DIGEST_LENGTH);
-		SHA1((unsigned char *)newtoken, strlen(newtoken), temp);
+		// Make sure to return if the SHA1 cannot be computed:
+		if(SHA1((unsigned char *)newtoken, strlen(newtoken), temp)==NULL){
+			pam_error(pamh,"Cannot compute SHA1(new_password");
+			return PAM_AUTHTOK_ERR;	
+		}
 		// Transform the hash into a 40-byte hexadecimal uppercase string:
     	for (i=0; i < SHA_DIGEST_LENGTH; i++)
 			sprintf((char*)&(buf[i*2]), "%02X", temp[i]);
