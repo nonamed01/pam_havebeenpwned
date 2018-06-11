@@ -275,6 +275,7 @@ PAM_EXTERN int pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const c
 				return PAM_SUCCESS;
 			}
 		}else{
+			free(chunk.memory);
 			// Impossible to initialise curl:
 			if(options.havebeenpwned_debug)
 				pam_syslog(pamh,LOG_ERR,"[HAVEIBEENPWNED: curl initialisation error]");
