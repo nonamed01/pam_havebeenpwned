@@ -14,8 +14,11 @@ returns PAM_AUTHOK_ERROR and the password is not changed.
 * Then, build & install the module:
 
 	git clone https://github.com/nonamed01/pam_havebeenpwned.git
+
 	cd pam_havebeenpwned
+
 	make
+
 	su -c "make install"
 
 * Edit /etc/pam.d/common-passwd and add the following line BEFORE the
