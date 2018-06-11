@@ -62,7 +62,6 @@ struct MemoryStruct {
 struct havebeenpwned_options {
 	unsigned int havebeenpwned_min_length;			// Minimum password length.
 	unsigned int havebeenpwned_debug;				// If 0, no debugging messages at all.
-	const char *have_been_pwned_url;				// The URL for the API call.
 };
 
 //--------------------------------------------------------------------------------------------
