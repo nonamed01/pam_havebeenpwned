@@ -9,3 +9,4 @@ pam_havebeenpwned.so: src/pam_havebeenpwned.c
 
 install:
 	cp pam_havebeenpwned.so /lib/x86_64-linux-gnu/security/pam_havebeenpwned.so
+	cp pam-configs/havebeenpwned /usr/share/pam-configs/
