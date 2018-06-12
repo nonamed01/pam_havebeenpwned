@@ -1,4 +1,3 @@
-CFLAGS += -Werror 
 all: pam_havebeenpwned.so
 
 clean:
