@@ -1,12 +1,12 @@
 # pam_havebeenpwned
 
-This PAM security module integrates the [IHaveBeenPwned API]
+This PAM security module integrates the **IHaveBeenPwned API**
 (https://haveibeenpwned.com/)  written by
 @Troy Hunt into PAM. Every time a user types a new password, a call to
 the API is made. If the password has been pwned, the module
-returns **PAM_AUTHOK_ERROR** and the password is not changed.
+returns **PAM_AUTHOK_ERR** and the password is not changed.
 
-This module leverages their [**K-Anonymity password database**]
+This module leverages their **K-Anonymity password database**
 (https://www.troyhunt.com/ive-just-launched-pwned-passwords-version-2/#cloudflareprivacyandkanonymity)
 
 # Build & Install
@@ -25,7 +25,7 @@ This module leverages their [**K-Anonymity password database**]
 
 	su -c "make install"
 
-* Edit **/etc/pam.d/common-passwd** and add the following line BEFORE the
+* Edit **/etc/pam.d/common-passwd** and add the following line *BEFORE* the
   first pam_unix.so entry:
 
 	password requisite pam_havebeenpwned.so [options]
@@ -35,7 +35,14 @@ This module leverages their [**K-Anonymity password database**]
 
 	password        [success=1 default=ignore]      pam_unix.so obscure sha512 try_first_pass
 
-	
+# Example of /etc/pam.d/common-password on a Debian system
+
+password 	requisite 	pam_havebeenpwned.so minlen=8
+password	[success=1 default=ignore]	pam_unix.so obscure sha512 try_first_pass
+password	requisite			pam_deny.so
+password	required			pam_permit.so
+password	optional	pam_gnome_keyring.so 
+
 # Module options
 
 	* debug.	If present, you will get debugging messages through /var/log/auth.log
@@ -46,7 +53,6 @@ This module leverages their [**K-Anonymity password database**]
 	
 	password requisite pam_havebeenpwned.so minlen=8 debug
 
-# Demonstration
+# Screenshot
 
 ![Screenshot](screenshot.png)
-

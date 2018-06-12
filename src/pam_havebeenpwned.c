@@ -135,7 +135,7 @@ PAM_EXTERN int pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const c
 	char buf[SHA_DIGEST_LENGTH*2];				// The SHA1 of the new password as a string
 
 	// URL for the API:
-	char GET[43];						// GET request is 43 + '\0'
+	char GET[43];						// GET request is 42 + '\0'
 	char PAYLOAD[6];					// The Hash to look for, 5 + '\0'
 	char CHECK[36];						// The rest of the hash (35 + '\0')
 
