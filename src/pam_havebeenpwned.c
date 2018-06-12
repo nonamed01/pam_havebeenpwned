@@ -9,7 +9,7 @@
 //  http://disabauxes.upc.es
 //	@disbauxes
 //
-// COMPILING: run ./buildPam.sh
+// COMPILING: make && su -c "make install"
 // INSTALLING: add the following line to /etc/pam.d/common-password BEFORE pam_unix.so
 //
 // password	requisite pam_havebeenpwned.so [options]
@@ -19,15 +19,13 @@
 // password requisite pam_havebeenpwned.so [options] (see below for options)
 // password        [success=1 default=ignore]      pam_unix.so obscure sha512 try_first_pass
 //
-//
 //	WARNING: This is a PoC, so don't use this module on a real system. Messing up with
 //			 PAM can lead to a total system lockdown or even worse; a total compromised
-//			 system. Feel free to modify, improve and secure this module and always
+//			 system. Feel free to modify, improve this module and always
 //			 test it ON a virtualised system. Take snapshots regularly to be able to
-//			 step back if need be.
+//			 step back if needs be.
 //
-//
-// REQUISITES:
+// BUILD REQUISITES:
 //
 // 			apt-get install libssl-dev libcurl4-openssl-dev libpam-dev
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -46,10 +44,10 @@
 // This is the default URL of the API.
 #define HAVEBEENPWNED_URL "https://api.pwnedpasswords.com/range/%s"
 
-// Default minim password length:
+// Default minimum password length:
 #define CO_MIN_LENGTH_BASE 6
 
-// By default, enable debugging messages.
+// By default, disable debugging messages.
 #define CO_PAM_DEBUG 0
 
 // This is the memory struct we will use to store CURL's response:
@@ -58,7 +56,7 @@ struct MemoryStruct {
   size_t size;				// Size of memory.
 };
 
-// This is the module options
+// Module options
 struct havebeenpwned_options {
 	unsigned int havebeenpwned_min_length;			// Minimum password length.
 	unsigned int havebeenpwned_debug;				// If 0, no debugging messages at all.
@@ -105,13 +103,13 @@ static int _pam_parse (pam_handle_t *pamh, struct havebeenpwned_options *opt,
 	// step trhough arguments:
 	for(ctrl=0;argc-- >0;++argv){
 		char *ep = NULL;
-		/* Min length; it should be at least > CO_MIN_LENGTH_BASE */
+		/* Min length; it should be at least >= CO_MIN_LENGTH_BASE */
 		if(!strncmp(*argv,"minlen=",7)){
 			opt->havebeenpwned_min_length = strtol(*argv+7,&ep,10);
 			if(!ep || (opt->havebeenpwned_min_length < CO_MIN_LENGTH_BASE))
 				opt->havebeenpwned_min_length = CO_MIN_LENGTH_BASE;
 		}
-		/* debug; when this option is present, add debugging messages to /var/log/auth.log */
+		/* debug; when this option is set, add debugging messages to /var/log/auth.log */
 		else if (!strncmp(*argv,"debug",5)){
 			opt->havebeenpwned_debug = 1;
 		}
@@ -119,9 +117,24 @@ static int _pam_parse (pam_handle_t *pamh, struct havebeenpwned_options *opt,
 
 }
 
-// The main thing: here we will send our Curl HTTP GET request with the SHA1 of the password.
-// The PAM library calls this function twice in succession. The first time with PAM_PRELIM_CHECK and then, if the module does not return
-// PAM_TRY_AGAIN, subsequently with PAM_UPDATE_AUTHTOK. It is only on the second call that the authorization token is (possibly) changed.
+//--------------------------------------------------------------------------------------------
+// pam_sm_chauthtok
+//	
+// The PAM library calls this function twice in succession. The first time with 
+// PAM_PRELIM_CHECK and then, if the module does not return PAM_TRY_AGAIN, 
+// subsequently with PAM_UPDATE_AUTHTOK.
+//
+// We do all the stuff when flags & PAM_UPDATE_AUTHTOK:
+//
+//	1) Get the current token.
+//  2) Ask for a new one.
+//  3) Compute its SHA1 hash.
+//  4) Call IHaveBeenPwned API.
+//  5) If the password is not pwned, confirm the new token.
+//  6) If the two tokens match up, we set stack the new token.
+//  7) On any other case, we do not stack the new token and return PAM_AUTHOK_ERR 	
+//
+//--------------------------------------------------------------------------------------------
 PAM_EXTERN int pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const char **argv){
 
 	int retval;
@@ -135,9 +148,9 @@ PAM_EXTERN int pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const c
 	char buf[SHA_DIGEST_LENGTH*2];				// The SHA1 of the new password as a string
 
 	// URL for the API:
-	char GET[43];						// GET request is 42 + '\0'
+	char GET[43];						// GET request,  42 + '\0'
 	char PAYLOAD[6];					// The Hash to look for, 5 + '\0'
-	char CHECK[36];						// The rest of the hash (35 + '\0')
+	char CHECK[36];						// The rest of the hash, 35 + '\0'
 
 	// CURL object:
 	CURL *curl;
@@ -159,7 +172,7 @@ PAM_EXTERN int pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const c
 
 	// First call to this module has flag PAM_PRELIM_CHECK; we do nothing here;
 	// Once the second call to this module is made, flags = PAM_UPDATE_AUTHTOK;
-	// then we do all the checkings.
+	// then we do all the stuff:
 	if (flags & PAM_UPDATE_AUTHTOK){
 
 		// Get the old password first:
@@ -174,7 +187,7 @@ PAM_EXTERN int pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const c
 		if(options.havebeenpwned_debug)
 			pam_syslog(pamh,LOG_INFO,"[HAVEIBEENPWNED: oldtoken OK]");
 
-		// Asks for a new password now, store it to newtoken:
+		// Asks for a new password now, save it to newtoken:
 		retval = pam_get_authtok_noverify (pamh, &newtoken, NULL);
 		if (retval != PAM_SUCCESS) {
 			pam_syslog(pamh, LOG_ERR, "pam_get_authtok_noverify returned error: %s",
@@ -199,7 +212,7 @@ PAM_EXTERN int pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const c
 		memset(temp, 0x0, SHA_DIGEST_LENGTH);
 		// Make sure to return if the SHA1 cannot be computed:
 		if(SHA1((unsigned char *)newtoken, strlen(newtoken), temp)==NULL){
-			pam_error(pamh,"Cannot compute SHA1(new_password");
+			pam_error(pamh,"Cannot compute SHA1(new_password)");
 			return PAM_AUTHTOK_ERR;	
 		}
 		// Transform the hash into a 40-byte hexadecimal uppercase string:
@@ -209,8 +222,8 @@ PAM_EXTERN int pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const c
 			pam_syslog(pamh,LOG_INFO,"[HAVEIBEENPWNED: newtoken SHA1: %s]", buf);
 
 		// We divide the SHA1 in two parts; the PAYLOAD to query the API
-		// and the rest of it to make a local comparison later on with CURL response.
-		strncpy(PAYLOAD,buf,5); PAYLOAD[5]='\0';					// the string to look for
+		// and the rest of it to make a local comparison later on with CURL's response.
+		strncpy(PAYLOAD,buf,5);  PAYLOAD[5]='\0';					// the string to look for
 		strncpy(CHECK,buf+5,35); CHECK[35] = '\0';					// The hash to compare to locally
 		if(options.havebeenpwned_debug){
 			pam_syslog(pamh,LOG_INFO,"[HAVEIBEENPWNED: newtoken SHA1:0:5  %s]", PAYLOAD);
@@ -259,9 +272,7 @@ PAM_EXTERN int pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const c
 				pam_set_item(pamh, PAM_AUTHTOK, NULL);
 				return PAM_AUTHTOK_ERR;
 			}else{
-				// We free the memory reserved:
 				free(chunk.memory);
-				// We can show output to the user:
 				pam_error(pamh,"OK: password has not been pwned (YET)");
 				// We make sure now the password is re-typed and it's the same one:
 				retval = pam_get_authtok_verify (pamh, &newtoken, NULL);
@@ -278,8 +289,8 @@ PAM_EXTERN int pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const c
 				return PAM_SUCCESS;
 			}
 		}else{
-			free(chunk.memory);
 			// Impossible to initialise curl:
+			free(chunk.memory);
 			if(options.havebeenpwned_debug)
 				pam_syslog(pamh,LOG_ERR,"[HAVEIBEENPWNED: curl initialisation error]");
 			pam_set_item(pamh, PAM_AUTHTOK, NULL);
