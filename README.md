@@ -17,12 +17,9 @@ This module leverages their **K-Anonymity password database**
 
 * Then, build & install the module:
 
-	git clone https://github.com/nonamed01/pam_havebeenpwned.git
-
-	cd pam_havebeenpwned
-
-	make
-
+	git clone https://github.com/nonamed01/pam_havebeenpwned.git  
+	cd pam_havebeenpwned  
+	make  
 	su -c "make install"
 
 * Edit **/etc/pam.d/common-passwd** and add the following line *BEFORE* the
@@ -37,11 +34,11 @@ This module leverages their **K-Anonymity password database**
 
 # Example of /etc/pam.d/common-password on a Debian system
 
-password 	requisite 	pam_havebeenpwned.so minlen=8
-password	[success=1 default=ignore]	pam_unix.so obscure sha512 try_first_pass
-password	requisite			pam_deny.so
-password	required			pam_permit.so
-password	optional	pam_gnome_keyring.so 
+password 	requisite 	pam_havebeenpwned.so minlen=8  
+password	[success=1 default=ignore]	pam_unix.so obscure sha512 try_first_pass  
+password	requisite			pam_deny.so  
+password	required			pam_permit.so  
+password	optional	pam_gnome_keyring.so  
 
 # Module options
 
