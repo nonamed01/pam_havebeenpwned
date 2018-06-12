@@ -32,6 +32,16 @@ This module leverages their **K-Anonymity password database**
 
 	password        [success=1 default=ignore]      pam_unix.so obscure sha512 try_first_pass
 
+# Automatic configuration using pam-auth-update
+
+Run:
+	
+	pam-auth-update
+
+And enable the module using the ncurses-gui interface as shown here:
+
+![Screenshot](pamauthupdate.png)
+
 # Example of /etc/pam.d/common-password on a Debian system
 
 password 	requisite 	pam_havebeenpwned.so minlen=8  
