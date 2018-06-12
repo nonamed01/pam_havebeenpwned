@@ -1,0 +1,9 @@
+Name: HaveIBeenPwned API password checker
+Default: no
+Priority: 1024
+Conflicts:
+Password-Type: Primary
+Password:
+        requisite                       pam_havebeenpwned.so minlen=8 debug
+Password-Initial:
+        requisite                       pam_havebeenpwned.so minlen=8 debug
