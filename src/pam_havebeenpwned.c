@@ -141,6 +141,20 @@ static int _pam_parse (pam_handle_t *pamh, struct havebeenpwned_options *opt,
 }
 
 //--------------------------------------------------------------------------------------------
+// cleanup
+//	
+//	We overwrite CURL's chunk.data memory with zeros, and then we free it.
+//  See http://www.linux-pam.org/Linux-PAM-html/mwg-see-programming-sec.html#mwg-see-programming-sec-token
+//--------------------------------------------------------------------------------------------
+int cleanup(pam_handle_t *pamh, void *data){
+	char *pdata;
+	if((pdata=data)){
+		while(*p) *p++ = '\0';
+		free(data);
+	} return PAM_SUCCESS;
+}
+
+//--------------------------------------------------------------------------------------------
 // pam_sm_chauthtok
 //	
 // The PAM library calls this function twice in succession. The first time with 
@@ -281,7 +295,8 @@ PAM_EXTERN int pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const c
 				// So we've got a CURL error. We should clean and exit with error:
 				curl_easy_cleanup(curl);
 				curl_global_cleanup();
-				free(chunk.memory);
+				//free(chunk.memory);
+				cleanup(pamh,chunk.memory);
 				pam_error(pamh,"CURL ERROR!");
 				return PAM_AUTHTOK_ERR;
 			}
@@ -299,7 +314,8 @@ PAM_EXTERN int pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const c
 						hashfoundp=strtok(NULL,"\r\n");
 					}
 				}
-				free(chunk.memory);
+				//free(chunk.memory);
+				cleanup(pamh,chunk.memory);
 				// Show how many times the password has been seen (if hashfoundp!=NULL):
 				if(options.havebeenpwned_seen && hashfoundp!=NULL)
 					 pam_error(pamh,"THIS PASSWORD HAS BEEN PWNED %s TIMES!",  hashfoundp);
@@ -309,7 +325,8 @@ PAM_EXTERN int pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const c
 				pam_set_item(pamh, PAM_AUTHTOK, NULL);
 				return PAM_AUTHTOK_ERR;
 			}else{
-				free(chunk.memory);
+				//free(chunk.memory);
+				cleanup(pamh,chunk.memory);
 				pam_error(pamh,"OK: password has not been pwned (YET)");
 				// We make sure now the password is re-typed and it's the same one:
 				retval = pam_get_authtok_verify (pamh, &newtoken, NULL);
@@ -327,7 +344,8 @@ PAM_EXTERN int pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const c
 			}
 		}else{
 			// Impossible to initialise curl:
-			free(chunk.memory);
+			//free(chunk.memory);
+			cleanup(pamh,chunk.memory);
 			if(options.havebeenpwned_debug)
 				pam_syslog(pamh,LOG_ERR,"[HAVEIBEENPWNED: curl initialisation error]");
 			pam_set_item(pamh, PAM_AUTHTOK, NULL);
