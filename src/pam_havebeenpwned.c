@@ -56,6 +56,9 @@
 // By default, don't process the number of times a password has been "seen":
 #define CO_PASSWORD_SEEN 0
 
+// Default timeout of 10 seconds:
+#define CO_CURL_TIMEOUT 10
+
 // This is the memory struct we will use to store CURL's response:
 struct MemoryStruct {
   char *memory;				// Pointer to the whole body response
@@ -67,6 +70,7 @@ struct havebeenpwned_options {
 	unsigned int havebeenpwned_min_length;			// Minimum password length.
 	unsigned int havebeenpwned_debug;				// If 0, no debugging messages at all.
 	unsigned int havebeenpwned_seen;				// If 1, it shows how many times a password has been seen
+	unsigned long havebeenpwned_timeout;			// CURL timeout.
 };
 
 //--------------------------------------------------------------------------------------------
@@ -102,6 +106,7 @@ static size_t WriteMemoryCallback(void *contents, size_t size, size_t nmemb, voi
 //		minlen=<LENGTH>; e.g.: minlen=8
 //		debug
 //		seen
+//		timeout=<TIMEOUT>; e.g.: timeout=30
 //--------------------------------------------------------------------------------------------
 static int _pam_parse (pam_handle_t *pamh, struct havebeenpwned_options *opt,
 	int argc, const char **argv){
@@ -124,6 +129,12 @@ static int _pam_parse (pam_handle_t *pamh, struct havebeenpwned_options *opt,
 		/* Report how many times a password has been seen */
 		else if (!strncmp(*argv,"seen",4)){
 			opt->havebeenpwned_seen = 1;
+		}
+		/* Timeout */
+		if(!strncmp(*argv,"timeout=",8)){
+			opt->havebeenpwned_timeout = strtol(*argv+8,&ep,10);
+			if(!ep || (opt->havebeenpwned_timeout < CO_CURL_TIMEOUT))
+				opt->havebeenpwned_timeout = CO_CURL_TIMEOUT;
 		}
 	} return ctrl;
 
@@ -177,6 +188,7 @@ PAM_EXTERN int pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const c
 	options.havebeenpwned_min_length = CO_MIN_LENGTH_BASE;
 	options.havebeenpwned_debug =  CO_PAM_DEBUG;
 	options.havebeenpwned_seen  =  CO_PASSWORD_SEEN;
+	options.havebeenpwned_timeout  =  CO_CURL_TIMEOUT;
 
 	// Process options:
 	ctrl = _pam_parse(pamh,&options,argc,argv);
@@ -264,6 +276,8 @@ PAM_EXTERN int pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const c
 			// CURL's response will be processed by WriteMemoryCallback:
   			curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
 			curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&chunk);
+			// Set the timeout:
+			curl_easy_setopt(curl, CURLOPT_TIMEOUT, options.havebeenpwned_timeout);
 			// Send the HTTP GET query:
 			res = curl_easy_perform(curl);
 			if(res!=CURLE_OK){

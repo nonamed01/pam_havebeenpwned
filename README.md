@@ -50,6 +50,7 @@ By default, these are the enabled module options:
 
 * minlen=8
 * seen 
+* timeout=20
 
 # Example of /etc/pam.d/common-password on a Debian system
 
@@ -66,6 +67,8 @@ password	optional	pam_gnome_keyring.so
 	* minlen.	The minimum password length. By default, 6 characters (hard-coded).
 
 	* seen.		If set, it will print the number of times this password has been seen. 
+
+	* timeout.	The total number of seconds until CURL aborts the request. Default: 10s.
 
 	EXAMPLES:
 	
