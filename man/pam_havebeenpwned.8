@@ -1,0 +1,111 @@
+'\" t
+.\"     Title: pam_havebeenpwned
+.\"    Author: [see the "AUTHOR" section]
+.\" Generator: DocBook XSL Stylesheets v1.78.1 <http://docbook.sf.net/>
+.\"      Date: 13/06/2018
+.\"    Manual: Linux-PAM Manual
+.\"    Source: Linux-PAM Manual
+.\"  Language: English
+.\"
+.TH "PAM_HAVEBEENPWNED" "8" "13/06/2018" "Linux-PAM Manual" "Linux\-PAM Manual"
+.\" -----------------------------------------------------------------
+.\" * Define some portability stuff
+.\" -----------------------------------------------------------------
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.\" http://bugs.debian.org/507673
+.\" http://lists.gnu.org/archive/html/groff/2009-02/msg00013.html
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.ie \n(.g .ds Aq \(aq
+.el       .ds Aq '
+.\" -----------------------------------------------------------------
+.\" * set default formatting
+.\" -----------------------------------------------------------------
+.\" disable hyphenation
+.nh
+.\" disable justification (adjust text to left margin only)
+.ad l
+.\" -----------------------------------------------------------------
+.\" * MAIN CONTENT STARTS HERE *
+.\" -----------------------------------------------------------------
+.SH "NAME"
+pam_havebeenpwned \- PAM module to check the password against data breaches using the IHaveBeenPwned API.
+.SH "SYNOPSIS"
+.HP \w'\fBpam_cracklib\&.so\fR\ 'u
+\fBpam_havebeenpwned\&.so\fR [\fI\&.\&.\&.\fR]
+.SH "DESCRIPTION"
+.PP
+This PAM security module integrates the \fBIHaveBeenPwned API\fB\fR (https://haveibeenpwned.com/) 
+written by @Troy Hunt into PAM. Every time a user types a new password, a call to the API is made. 
+If the password has been pwned, the module returns \fBPAM_AUTHOK_ERR\fB\fR and the password is not changed.
+
+This module leverages their \fBK-Anonymity password database\fB\fR (https://www.troyhunt.com/ive-just-launched-pwned-passwords-version-2/#cloudflareprivacyandkanonymity)
+.PP
+.SH "OPTIONS"
+.PP
+\fBminlen=\fR\fB\fIN\fR\fR
+.RS 4
+The minimum acceptable length for the new password\&.
+.RE
+.PP
+\fBtimeout=\fR\fB\fIN\fR\fR
+.RS 4
+Sets the timeout in seconds until CURL returns an error\&.
+.RE
+.PP
+\fBdebug\fR\fB\fR
+.RS 4
+If set, the module will show some debugging output to \fB/var/log/auth.log\fB\&.
+.RE
+.PP
+\fBseen\fR\fB\fR
+.RS 4
+If set, the module will show the total number of times a password has been seen\&.
+.RE
+.SH "MODULE TYPES PROVIDED"
+.PP
+Only the
+\fBpassword\fR
+module type is provided\&.
+.SH "RETURN VALUES"
+.PP
+.PP
+PAM_SUCCESS
+.RS 4
+The new password is at least >minlen character-long and it's not in the IHaveBeenPwned site\&.
+.RE
+.PP
+PAM_AUTHTOK_ERR
+.RS 4
+No new password was entered, the username could not be determined or the new password is in the IHaveBeenPwned site\&.
+.RE
+.SH "EXAMPLES"
+.PP
+For an example of the use of this module, we show how it may be stacked with the password component of
+\fBpam_unix\fR(8)
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+#
+# These lines stack two password type modules\&.The
+# "try_first_pass" argument ensures that the pam_unix module does not
+# prompt for a password, but instead uses the one provided by
+# pam_havebeenpwned\&.
+#
+password requisite pam_havebeenpwned.so minlen=12 seen timeout=20
+password	[success=1 default=ignore]	pam_unix.so obscure sha512 try_first_pass
+      
+.fi
+.if n \{\
+.RE
+.\}
+.SH "SEE ALSO"
+.PP
+\fBpam.conf\fR(5),
+\fBpam.d\fR(5),
+\fBpam\fR(7),
+\fBhttps://github.com/nonamed01/pam_havebeenpwned\fR
+.SH "AUTHOR"
+.PP
+pam_cracklib was written by Toni Castillo Girona <toni.castillo@upc\&.edu>
