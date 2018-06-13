@@ -149,7 +149,7 @@ static int _pam_parse (pam_handle_t *pamh, struct havebeenpwned_options *opt,
 int cleanup(pam_handle_t *pamh, void *data){
 	char *pdata;
 	if((pdata=data)){
-		while(*p) *p++ = '\0';
+		while(*pdata) *pdata++ = '\0';
 		free(data);
 	} return PAM_SUCCESS;
 }
