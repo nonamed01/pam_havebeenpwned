@@ -59,6 +59,12 @@ git pull
 make  
 su -c "make install"
 
+# Documentation
+
+run:  
+
+man pam_havebeenpwned
+
 # Example of /etc/pam.d/common-password on a Debian system
 
 password 	requisite 	pam_havebeenpwned.so minlen=8  
