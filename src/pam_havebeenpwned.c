@@ -246,17 +246,11 @@ PAM_EXTERN int pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const c
 		// Transform the hash into a 40-byte hexadecimal uppercase string:
     	for (i=0; i < SHA_DIGEST_LENGTH; i++)
 			sprintf((char*)&(buf[i*2]), "%02X", temp[i]);
-		if(options.havebeenpwned_debug)
-			pam_syslog(pamh,LOG_INFO,"[HAVEIBEENPWNED: newtoken SHA1: %s]", buf);
 
 		// We divide the SHA1 in two parts; the PAYLOAD to query the API
 		// and the rest of it to make a local comparison later on with CURL's response.
 		strncpy(PAYLOAD,buf,5);  PAYLOAD[5]='\0';					// the string to look for
 		strncpy(CHECK,buf+5,35); CHECK[35] = '\0';					// The hash to compare to locally
-		if(options.havebeenpwned_debug){
-			pam_syslog(pamh,LOG_INFO,"[HAVEIBEENPWNED: newtoken SHA1:0:5  %s]", PAYLOAD);
-			pam_syslog(pamh,LOG_INFO,"[HAVEIBEENPWNED: newtoken SHA1:5:40 %s]", CHECK);
-		}
 		// snprintf also adds '\0' to the copy, but anyway we make sure to add it too:
 		// This is the actual HTTP GET Request we will make using CURL:
 		snprintf(GET,43,HAVEBEENPWNED_URL,PAYLOAD); GET[42]='\0';
