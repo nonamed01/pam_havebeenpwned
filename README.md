@@ -57,7 +57,7 @@ By default, these are the enabled module options:
 cd pam_havebeenpwned  
 git pull  
 make  
-make install
+su -c "make install"
 
 # Example of /etc/pam.d/common-password on a Debian system
 
