@@ -74,6 +74,7 @@ password	optional	pam_gnome_keyring.so
 	
 	password requisite pam_havebeenpwned.so minlen=8 debug  
 	password requisite pam_havebeenpwned.so minlen=12 seen
+	password requisite pam_havebeenpwned.so minlen=12 timeout=20 seen debug
 
 # Screenshot
 
