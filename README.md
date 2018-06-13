@@ -52,6 +52,13 @@ By default, these are the enabled module options:
 * seen 
 * timeout=20
 
+# Updating
+
+cd pam_havebeenpwned  
+git pull  
+make  
+make install
+
 # Example of /etc/pam.d/common-password on a Debian system
 
 password 	requisite 	pam_havebeenpwned.so minlen=8  
