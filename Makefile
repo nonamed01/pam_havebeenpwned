@@ -1,3 +1,4 @@
+CFLAGS+= -Wall
 all: pam_havebeenpwned.so
 
 clean:

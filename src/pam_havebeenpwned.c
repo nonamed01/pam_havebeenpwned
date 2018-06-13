@@ -161,7 +161,7 @@ static int _pam_parse (pam_handle_t *pamh, struct havebeenpwned_options *opt,
 PAM_EXTERN int pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const char **argv){
 
 	int retval;
-	unsigned int ctrl, i;
+	unsigned int i;
 	const void *oldtoken = NULL;				// Old password
 	const char *newtoken = NULL;				// New password
 
@@ -191,7 +191,7 @@ PAM_EXTERN int pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const c
 	options.havebeenpwned_timeout  =  CO_CURL_TIMEOUT;
 
 	// Process options:
-	ctrl = _pam_parse(pamh,&options,argc,argv);
+	_pam_parse(pamh,&options,argc,argv);
 
 	// Show which call this module is in now:
 	if(options.havebeenpwned_debug)
