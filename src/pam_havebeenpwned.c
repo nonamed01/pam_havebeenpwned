@@ -41,6 +41,9 @@
 #include <curl/curl.h>
 #include <syslog.h>
 
+// Version
+#define VERSION	0.2
+
 // This is the default URL of the API.
 #define HAVEBEENPWNED_URL "https://api.pwnedpasswords.com/range/%s"
 
@@ -49,6 +52,9 @@
 
 // By default, disable debugging messages.
 #define CO_PAM_DEBUG 0
+
+// By default, don't process the number of times a password has been "seen":
+#define CO_PASSWORD_SEEN 0
 
 // This is the memory struct we will use to store CURL's response:
 struct MemoryStruct {
@@ -60,6 +66,7 @@ struct MemoryStruct {
 struct havebeenpwned_options {
 	unsigned int havebeenpwned_min_length;			// Minimum password length.
 	unsigned int havebeenpwned_debug;				// If 0, no debugging messages at all.
+	unsigned int havebeenpwned_seen;				// If 1, it shows how many times a password has been seen
 };
 
 //--------------------------------------------------------------------------------------------
@@ -94,6 +101,7 @@ static size_t WriteMemoryCallback(void *contents, size_t size, size_t nmemb, voi
 //	OPTIONS:
 //		minlen=<LENGTH>; e.g.: minlen=8
 //		debug
+//		seen
 //--------------------------------------------------------------------------------------------
 static int _pam_parse (pam_handle_t *pamh, struct havebeenpwned_options *opt,
 	int argc, const char **argv){
@@ -112,6 +120,10 @@ static int _pam_parse (pam_handle_t *pamh, struct havebeenpwned_options *opt,
 		/* debug; when this option is set, add debugging messages to /var/log/auth.log */
 		else if (!strncmp(*argv,"debug",5)){
 			opt->havebeenpwned_debug = 1;
+		}
+		/* Report how many times a password has been seen */
+		else if (!strncmp(*argv,"seen",4)){
+			opt->havebeenpwned_seen = 1;
 		}
 	} return ctrl;
 
@@ -153,14 +165,18 @@ PAM_EXTERN int pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const c
 	char CHECK[36];						// The rest of the hash, 35 + '\0'
 
 	// CURL object:
-	CURL *curl;
+	CURL *curl = NULL;
 	CURLcode res;
 	struct MemoryStruct chunk;
+
+	char *hashfound = NULL;				// Only used if password_seen is set.
+	char *hashfoundp = NULL;
 
 	// Initialize default options
 	memset(&options,0,sizeof(options));
 	options.havebeenpwned_min_length = CO_MIN_LENGTH_BASE;
 	options.havebeenpwned_debug =  CO_PAM_DEBUG;
+	options.havebeenpwned_seen  =  CO_PASSWORD_SEEN;
 
 	// Process options:
 	ctrl = _pam_parse(pamh,&options,argc,argv);
@@ -229,7 +245,9 @@ PAM_EXTERN int pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const c
 			pam_syslog(pamh,LOG_INFO,"[HAVEIBEENPWNED: newtoken SHA1:0:5  %s]", PAYLOAD);
 			pam_syslog(pamh,LOG_INFO,"[HAVEIBEENPWNED: newtoken SHA1:5:40 %s]", CHECK);
 		}
-		snprintf(GET,43,HAVEBEENPWNED_URL,PAYLOAD); GET[42]='\0';				// We construct the query for CURL
+		// snprintf also adds '\0' to the copy, but anyway we make sure to add it too:
+		// This is the actual HTTP GET Request we will make using CURL:
+		snprintf(GET,43,HAVEBEENPWNED_URL,PAYLOAD); GET[42]='\0';
 		if(options.havebeenpwned_debug)
 			pam_syslog(pamh,LOG_INFO,"[HAVEIBEENPWNED: URL %s]", GET);
 
@@ -264,10 +282,21 @@ PAM_EXTERN int pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const c
 			//Cleanup:
 			curl_easy_cleanup(curl);
 			curl_global_cleanup();
-			// We have the response in our chunk structure:
-			if(strstr(chunk.memory,CHECK)){
+			// We have the response in chunk.memory:
+			if(NULL!=(hashfound=(strstr(chunk.memory,CHECK)))){
+				// Get how many times the password has been seen?
+				if(options.havebeenpwned_seen){
+					if(NULL!=(hashfoundp = strtok(hashfound,":"))){
+						// Next delimiter is \r\n:
+						hashfoundp=strtok(NULL,"\r\n");
+					}
+				}
 				free(chunk.memory);
-				pam_error(pamh,"THIS PASSWORD HAS BEEN PWNED!");
+				// Show how many times the password has been seen (if hashfoundp!=NULL):
+				if(options.havebeenpwned_seen && hashfoundp!=NULL)
+					 pam_error(pamh,"THIS PASSWORD HAS BEEN PWNED %s TIMES!",  hashfoundp);
+				else
+					pam_error(pamh,"THIS PASSWORD HAS BEEN PWNED!");
 				// We reset the new password to NULL (so no change):
 				pam_set_item(pamh, PAM_AUTHTOK, NULL);
 				return PAM_AUTHTOK_ERR;

@@ -22,6 +22,9 @@ This module leverages their **K-Anonymity password database**
 	make  
 	su -c "make install"
 
+* Enable the module automatically by running **pam-auth-update** (see below)
+  or, alternatively, you can do it by hand:
+
 * Edit **/etc/pam.d/common-passwd** and add the following line *BEFORE* the
   first pam_unix.so entry:
 
@@ -42,6 +45,12 @@ And enable the module using the ncurses-gui interface as shown here:
 
 ![Screenshot](pamauthupdate.png)
 
+The priority for this module is calculated according to https://wiki.ubuntu.com/PAMConfigFrameworkSpec.  
+By default, these are the enabled module options:  
+
+* minlen=8
+* seen 
+
 # Example of /etc/pam.d/common-password on a Debian system
 
 password 	requisite 	pam_havebeenpwned.so minlen=8  
@@ -52,13 +61,16 @@ password	optional	pam_gnome_keyring.so
 
 # Module options
 
-	* debug.	If present, you will get debugging messages through /var/log/auth.log
+	* debug.	If set, you will get debugging messages through /var/log/auth.log
 
-	* minlen.	The minimum password length. By default, 6 characters.
+	* minlen.	The minimum password length. By default, 6 characters (hard-coded).
 
-	EXAMPLE:
+	* seen.		If set, it will print the number of times this password has been seen. 
+
+	EXAMPLES:
 	
-	password requisite pam_havebeenpwned.so minlen=8 debug
+	password requisite pam_havebeenpwned.so minlen=8 debug  
+	password requisite pam_havebeenpwned.so minlen=12 seen
 
 # Screenshot
 
