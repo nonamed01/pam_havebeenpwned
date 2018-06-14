@@ -61,6 +61,12 @@ If set, the module will show some debugging output to \fB/var/log/auth.log\fB\&.
 .RS 4
 If set, the module will show the total number of times a password has been seen\&.
 .RE
+.PP
+\fBenforceonerror\fR\fB\fR
+.RS 4
+If set, any error communicating with the API makes this module return PAM_AUTHTOK_ERR and
+exit. If not set, the new password is stacked for the next PAM module to process\&.
+.RE
 .SH "MODULE TYPES PROVIDED"
 .PP
 Only the
@@ -93,7 +99,7 @@ For an example of the use of this module, we show how it may be stacked with the
 # prompt for a password, but instead uses the one provided by
 # pam_havebeenpwned\&.
 #
-password requisite pam_havebeenpwned.so minlen=12 seen timeout=20
+password requisite pam_havebeenpwned.so minlen=12 seen timeout=20 enforceonerror
 password	[success=1 default=ignore]	pam_unix.so obscure sha512 try_first_pass
       
 .fi

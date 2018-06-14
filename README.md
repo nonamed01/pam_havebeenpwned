@@ -46,17 +46,19 @@ And enable the module using the ncurses-gui interface as shown here:
 ![Screenshot](pamauthupdate.png)
 
 The priority for this module is calculated according to https://wiki.ubuntu.com/PAMConfigFrameworkSpec.  
-By default, these are the enabled module options:  
+By default, these are the enabled module options (see **Module options**):  
 
 * minlen=8
 * seen 
 * timeout=20
+* enforceonerror
 
 # Updating
 
 cd pam_havebeenpwned  
 git pull  
-make  
+make 
+pam-auth-update and disable the module 
 su -c "make install"
 
 # Documentation
@@ -75,19 +77,24 @@ password	optional	pam_gnome_keyring.so
 
 # Module options
 
-	* debug.	If set, you will get debugging messages through /var/log/auth.log
+	* debug.		If set, you will get debugging messages through /var/log/auth.log
 
-	* minlen.	The minimum password length. By default, 6 characters (hard-coded).
+	* minlen.		The minimum password length. By default, 6 characters (hard-coded).
 
-	* seen.		If set, it will print the number of times this password has been seen. 
+	* seen.			If set, it will print the number of times this password has been seen. 
 
-	* timeout.	The total number of seconds until CURL aborts the request. Default: 10s.
+	* timeout.		The total number of seconds until CURL aborts the request. Default: 10s.
+
+	* enforceonerror. If set, whenever an error occurs communicating with the API (Network errors,
+					  API errors, and so on) the module returns PAM_AUTHTOK_ERR and exits. If
+					 this option is not set, the password is stacked for the next module to
+					 process.
 
 	EXAMPLES:
 	
 	password requisite pam_havebeenpwned.so minlen=8 debug  
 	password requisite pam_havebeenpwned.so minlen=12 seen
-	password requisite pam_havebeenpwned.so minlen=12 timeout=20 seen debug
+	password requisite pam_havebeenpwned.so minlen=12 timeout=20 seen debug enforceonerror
 
 # Screenshot
 

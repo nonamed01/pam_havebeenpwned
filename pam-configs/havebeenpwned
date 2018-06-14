@@ -4,6 +4,6 @@ Priority: 1024
 Conflicts:
 Password-Type: Primary
 Password:
-        requisite                       pam_havebeenpwned.so minlen=8 seen timeout=20
+        requisite                       pam_havebeenpwned.so minlen=8 seen timeout=20 enforceonerror
 Password-Initial:
-        requisite                       pam_havebeenpwned.so minlen=8 seen timeout=20
+        requisite                       pam_havebeenpwned.so minlen=8 seen timeout=20 enforceonerror

@@ -59,6 +59,10 @@
 // Default timeout of 10 seconds:
 #define CO_CURL_TIMEOUT 10
 
+// By default, if there's an error communicating with the API,
+// the module does not return an error and stacks the new password.
+#define CO_ENFORCE_ON_ERROR 0
+
 // This is the memory struct we will use to store CURL's response:
 struct MemoryStruct {
   char *memory;				// Pointer to the whole body response
@@ -71,6 +75,9 @@ struct havebeenpwned_options {
 	unsigned int havebeenpwned_debug;				// If 0, no debugging messages at all.
 	unsigned int havebeenpwned_seen;				// If 1, it shows how many times a password has been seen
 	unsigned long havebeenpwned_timeout;			// CURL timeout.
+	unsigned int havebeenpwned_enforceonerror;		// If set to 1, it does not pass the new password to the
+													// next module and exits with error even if CURL cannot
+													// finish its request.
 };
 
 //--------------------------------------------------------------------------------------------
@@ -135,6 +142,10 @@ static int _pam_parse (pam_handle_t *pamh, struct havebeenpwned_options *opt,
 			opt->havebeenpwned_timeout = strtol(*argv+8,&ep,10);
 			if(!ep || (opt->havebeenpwned_timeout < CO_CURL_TIMEOUT))
 				opt->havebeenpwned_timeout = CO_CURL_TIMEOUT;
+		}
+		/* Enforce on error */
+		else if (!strncmp(*argv,"enforceonerror",14)){
+			opt->havebeenpwned_enforceonerror = 1;
 		}
 	} return ctrl;
 
@@ -203,6 +214,7 @@ PAM_EXTERN int pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const c
 	options.havebeenpwned_debug =  CO_PAM_DEBUG;
 	options.havebeenpwned_seen  =  CO_PASSWORD_SEEN;
 	options.havebeenpwned_timeout  =  CO_CURL_TIMEOUT;
+	options.havebeenpwned_enforceonerror = 	CO_ENFORCE_ON_ERROR;
 
 	// Process options:
 	_pam_parse(pamh,&options,argc,argv);
@@ -296,8 +308,27 @@ PAM_EXTERN int pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const c
 				curl_easy_cleanup(curl);
 				curl_global_cleanup();
 				cleanup(pamh,chunk.memory);
-				pam_error(pamh,"CURL ERROR!");
-				return PAM_AUTHTOK_ERR;
+				// Do we have enforceonerror == 0?
+				if(options.havebeenpwned_enforceonerror){
+					pam_error(pamh,"CURL or API ERROR; quitting...");
+					return PAM_AUTHTOK_ERR;
+				}else{
+					// If enforceonerror is not set, just ask for confirmation and pass it on:
+					pam_error(pamh,"CURL or API error; the password WON'T be checked.");
+					// We make sure now the password is re-typed and it's the same one:
+					retval = pam_get_authtok_verify (pamh, &newtoken, NULL);
+					if (retval != PAM_SUCCESS) {
+						pam_syslog(pamh, LOG_ERR, "pam_get_authtok_verify returned error: %s",
+								pam_strerror (pamh, retval));
+						pam_set_item(pamh, PAM_AUTHTOK, NULL);
+						return PAM_AUTHTOK_ERR;
+					}else if (newtoken == NULL) {	// User aborted password change
+						return PAM_AUTHTOK_ERR;
+					}
+					// Stack the new password for the next module and return:
+					pam_set_item(pamh,PAM_AUTHTOK,newtoken);
+					return PAM_SUCCESS;
+				}
 			}
 			if(options.havebeenpwned_debug)
 				pam_syslog(pamh,LOG_INFO,"[HAVEIBEENPWNED: curl received bytes: %lu]",chunk.size);
