@@ -57,7 +57,7 @@ By default, these are the enabled module options (see **Module options**):
 
 cd pam_havebeenpwned  
 git pull  
-make 
+make  
 pam-auth-update and disable the module  
 su -c "make install"
 
