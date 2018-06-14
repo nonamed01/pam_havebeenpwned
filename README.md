@@ -86,7 +86,7 @@ password	optional	pam_gnome_keyring.so
 	* timeout.		The total number of seconds until CURL aborts the request. Default: 10s.
 
 	* enforceonerror.	 If set, whenever an error occurs communicating with the API (Network
-						 errors, API errors, and so on) the module returns PAM_AUTHTOK_ERR and exits.
+				 errors, API errors, and so on) the module returns PAM_AUTHTOK_ERR and exits.
 
 	EXAMPLES:
 	
