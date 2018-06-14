@@ -387,6 +387,6 @@ PAM_EXTERN int pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const c
 				pam_syslog(pamh,LOG_ERR,"[HAVEIBEENPWNED: curl initialisation error]");
 			pam_set_item(pamh, PAM_AUTHTOK, NULL);
 			return PAM_AUTHTOK_ERR;
-		} return PAM_AUTHTOK_ERR;
+		}
 	}else return PAM_SUCCESS;	/* first call to this module do nothing */
 }
