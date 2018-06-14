@@ -25,7 +25,7 @@
 //			 test it ON a virtualised system. Take snapshots regularly to be able to
 //			 step back if needs be.
 //
-// BUILD REQUISITES:
+// BUILD PREQUISITES:
 //
 // 			apt-get install libssl-dev libcurl4-openssl-dev libpam-dev
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -75,9 +75,7 @@ struct havebeenpwned_options {
 	unsigned int havebeenpwned_debug;				// If 0, no debugging messages at all.
 	unsigned int havebeenpwned_seen;				// If 1, it shows how many times a password has been seen
 	unsigned long havebeenpwned_timeout;			// CURL timeout.
-	unsigned int havebeenpwned_enforceonerror;		// If set to 1, it does not pass the new password to the
-													// next module and exits with error even if CURL cannot
-													// finish its request.
+	unsigned int havebeenpwned_enforceonerror;		// If there are network/API errors, and its set, ends with error.
 };
 
 //--------------------------------------------------------------------------------------------
@@ -195,20 +193,21 @@ PAM_EXTERN int pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const c
     unsigned char temp[SHA_DIGEST_LENGTH];		// The SHA1 of the new password
 	char buf[SHA_DIGEST_LENGTH*2];				// The SHA1 of the new password as a string
 
-	// URL for the API:
+	/* API parameters and URL */
 	char GET[43];						// GET request,  42 + '\0'
 	char PAYLOAD[6];					// The Hash to look for, 5 + '\0'
 	char CHECK[36];						// The rest of the hash, 35 + '\0'
 
-	// CURL object:
+	/* CURL */
 	CURL *curl = NULL;
 	CURLcode res;
 	struct MemoryStruct chunk;
 
-	char *hashfound = NULL;				// Only used if password_seen is set.
+	/* Used for "seen" parameter */
+	char *hashfound = NULL;
 	char *hashfoundp = NULL;
 
-	// Initialize default options
+	/* Default options initialization */
 	memset(&options,0,sizeof(options));
 	options.havebeenpwned_min_length = CO_MIN_LENGTH_BASE;
 	options.havebeenpwned_debug =  CO_PAM_DEBUG;
@@ -216,20 +215,17 @@ PAM_EXTERN int pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const c
 	options.havebeenpwned_timeout  =  CO_CURL_TIMEOUT;
 	options.havebeenpwned_enforceonerror = 	CO_ENFORCE_ON_ERROR;
 
-	// Process options:
+	/* Process options */
 	_pam_parse(pamh,&options,argc,argv);
 
-	// Show which call this module is in now:
 	if(options.havebeenpwned_debug)
 		pam_syslog(pamh,LOG_INFO,"[HAVEIBEENPWNED: PAM module start: %s]",
 			(flags&PAM_PRELIM_CHECK)?"PAM_PRELIM_CHECK":"PAM_UPDATEAUTHOK");
 
-	// First call to this module has flag PAM_PRELIM_CHECK; we do nothing here;
-	// Once the second call to this module is made, flags = PAM_UPDATE_AUTHTOK;
-	// then we do all the stuff:
+	/* Do our stuff is flags & PAM_UPDATE_AUTHTOK */
 	if (flags & PAM_UPDATE_AUTHTOK){
 
-		// Get the old password first:
+		/* Get old password */
 		retval = pam_get_item (pamh, PAM_OLDAUTHTOK, &oldtoken);
 		if (retval != PAM_SUCCESS) {
 			pam_syslog(pamh,LOG_ERR,"Can not get old passwd");
@@ -237,22 +233,21 @@ PAM_EXTERN int pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const c
 		 	return PAM_AUTHTOK_ERR;
 		}
 
-		// We've got the old password:
 		if(options.havebeenpwned_debug)
 			pam_syslog(pamh,LOG_INFO,"[HAVEIBEENPWNED: oldtoken OK]");
 
-		// Asks for a new password now, save it to newtoken:
+		/* Ask for a new password */
 		retval = pam_get_authtok_noverify (pamh, &newtoken, NULL);
 		if (retval != PAM_SUCCESS) {
 			pam_syslog(pamh, LOG_ERR, "pam_get_authtok_noverify returned error: %s",
 				pam_strerror (pamh, retval));
 		 	return PAM_AUTHTOK_ERR;
-		// User has cancelled the changing of the password:
+		/* Cancellation */
 		} else if (newtoken == NULL) {
 			return PAM_AUTHTOK_ERR;
 		}
 
-		//If password's length is < MINLEN chars, error:
+		/* Check password's length */
 		if(strlen(newtoken)<options.havebeenpwned_min_length){
 			pam_error(pamh,"Password is too short!");
 			return PAM_AUTHTOK_ERR;
@@ -261,124 +256,137 @@ PAM_EXTERN int pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const c
 	    if(options.havebeenpwned_debug)
 			pam_syslog(pamh,LOG_INFO,"[HAVEIBEENPWNED: newtoken OK]");
 
-		// Generate the SHA1 of this new password.
+		/* SHA1(newtoken) generation */
 		memset(buf, 0x0, SHA_DIGEST_LENGTH*2);
 		memset(temp, 0x0, SHA_DIGEST_LENGTH);
-		// Make sure to return if the SHA1 cannot be computed:
 		if(SHA1((unsigned char *)newtoken, strlen(newtoken), temp)==NULL){
 			pam_error(pamh,"Cannot compute SHA1(new_password)");
 			return PAM_AUTHTOK_ERR;	
 		}
-		// Transform the hash into a 40-byte hexadecimal uppercase string:
+		/* Transform the hash into a 40-byte long hexadecimal string */
     	for (i=0; i < SHA_DIGEST_LENGTH; i++)
 			sprintf((char*)&(buf[i*2]), "%02X", temp[i]);
 
-		// We divide the SHA1 in two parts; the PAYLOAD to query the API
-		// and the rest of it to make a local comparison later on with CURL's response.
+		/* We divide the SHA1 in two parts; the PAYLOAD to query the API
+		and the rest of it to make a local comparison later on with CURL's response.*/
 		strncpy(PAYLOAD,buf,5);  PAYLOAD[5]='\0';					// the string to look for
 		strncpy(CHECK,buf+5,35); CHECK[35] = '\0';					// The hash to compare to locally
-		// snprintf also adds '\0' to the copy, but anyway we make sure to add it too:
-		// This is the actual HTTP GET Request we will make using CURL:
 		snprintf(GET,43,HAVEBEENPWNED_URL,PAYLOAD); GET[42]='\0';
 		if(options.havebeenpwned_debug)
 			pam_syslog(pamh,LOG_INFO,"[HAVEIBEENPWNED: URL %s]", GET);
 
-		// We initialize our memory structure to accomodate CURL's response:
+		/* Initialize memory for CURL's response */
 		chunk.memory = malloc(1);
 		chunk.size = 0;
 		curl_global_init(CURL_GLOBAL_ALL);
 
-		// Using CURL, we send the request. We need to make sure we find
-		// the exact MATCH within CURL's response.
+		/* Initialize CURL */
 		curl = curl_easy_init();
 		if(curl){
 			curl_easy_setopt(curl, CURLOPT_URL,GET);
-			// CURL's response will be processed by WriteMemoryCallback:
+			/* CURL's response will be processed by our Callback function: */
   			curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
 			curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&chunk);
-			// Set the timeout:
+			/* Timeout */
 			curl_easy_setopt(curl, CURLOPT_TIMEOUT, options.havebeenpwned_timeout);
-			// Send the HTTP GET query:
+
+			/* Send the request */
 			res = curl_easy_perform(curl);
+
+			/* Now me zero out the entire contents of GET,PAYLOAD,buf and temp: */
+			memset(GET,0,43);
+			memset(PAYLOAD,0,6);
+			memset(buf, 0x0, SHA_DIGEST_LENGTH*2);
+			memset(temp, 0x0, SHA_DIGEST_LENGTH);
+
+			/* Process CURL error */
 			if(res!=CURLE_OK){
+				/* We can now zeroout CHECK */
+				memset(CHECK,0,36);
 				if(options.havebeenpwned_debug)
 					pam_syslog(pamh,LOG_ERR,"[HAVEIBEENPWNED: curl_easy_perform error: %s]",
 						curl_easy_strerror(res));	
-				// So we've got a CURL error. We should clean and exit with error:
+				/* Cleanup */
 				curl_easy_cleanup(curl);
 				curl_global_cleanup();
 				cleanup(pamh,chunk.memory);
-				// Do we have enforceonerror == 0?
+				/* Exit if enforceonerror */
 				if(options.havebeenpwned_enforceonerror){
 					pam_error(pamh,"CURL or API ERROR; quitting...");
 					return PAM_AUTHTOK_ERR;
 				}else{
-					// If enforceonerror is not set, just ask for confirmation and pass it on:
 					pam_error(pamh,"CURL or API error; the password WON'T be checked.");
-					// We make sure now the password is re-typed and it's the same one:
+					/* Confirm the new password */
 					retval = pam_get_authtok_verify (pamh, &newtoken, NULL);
 					if (retval != PAM_SUCCESS) {
 						pam_syslog(pamh, LOG_ERR, "pam_get_authtok_verify returned error: %s",
 								pam_strerror (pamh, retval));
 						pam_set_item(pamh, PAM_AUTHTOK, NULL);
 						return PAM_AUTHTOK_ERR;
-					}else if (newtoken == NULL) {	// User aborted password change
+					/* Cancelation */
+					}else if (newtoken == NULL) {
 						return PAM_AUTHTOK_ERR;
 					}
-					// Stack the new password for the next module and return:
+					/* Stack the new password for the next module and return: */
 					pam_set_item(pamh,PAM_AUTHTOK,newtoken);
 					return PAM_SUCCESS;
 				}
 			}
 			if(options.havebeenpwned_debug)
 				pam_syslog(pamh,LOG_INFO,"[HAVEIBEENPWNED: curl received bytes: %lu]",chunk.size);
-			//Cleanup:
+			/* Cleanup */
 			curl_easy_cleanup(curl);
 			curl_global_cleanup();
-			// We have the response in chunk.memory:
+			/* Process API response */
 			if(NULL!=(hashfound=(strstr(chunk.memory,CHECK)))){
-				// Get how many times the password has been seen?
+				/* We can now zeroout CHECK */
+				memset(CHECK,0,36);
+				/* Times seen */
 				if(options.havebeenpwned_seen){
-					if(NULL!=(hashfoundp = strtok(hashfound,":"))){
-						// Next delimiter is \r\n:
+					if(NULL!=(hashfoundp = strtok(hashfound,":")))
 						hashfoundp=strtok(NULL,"\r\n");
-					}
 				}
 				cleanup(pamh,chunk.memory);
-				// Show how many times the password has been seen (if hashfoundp!=NULL):
+				/* seen is set? */
 				if(options.havebeenpwned_seen && hashfoundp!=NULL)
 					 pam_error(pamh,"THIS PASSWORD HAS BEEN PWNED %s TIMES!",  hashfoundp);
 				else
 					pam_error(pamh,"THIS PASSWORD HAS BEEN PWNED!");
-				// We reset the new password to NULL (so no change):
+				/* New password is not valid */
 				pam_set_item(pamh, PAM_AUTHTOK, NULL);
 				return PAM_AUTHTOK_ERR;
 			}else{
+				/* We can now zeroout CHECK */
+				memset(CHECK,0,36);
 				cleanup(pamh,chunk.memory);
-				pam_error(pamh,"OK: password has not been pwned (YET)");
-				// We make sure now the password is re-typed and it's the same one:
+				pam_info(pamh,"OK: password has not been pwned (YET)");
+				/* Confirmation */
 				retval = pam_get_authtok_verify (pamh, &newtoken, NULL);
 				if (retval != PAM_SUCCESS) {
 					pam_syslog(pamh, LOG_ERR, "pam_get_authtok_verify returned error: %s",
 							pam_strerror (pamh, retval));
 					pam_set_item(pamh, PAM_AUTHTOK, NULL);
 					return PAM_AUTHTOK_ERR;
-				}else if (newtoken == NULL) {	// User aborted password change
+				}else if (newtoken == NULL) 
 					return PAM_AUTHTOK_ERR;
-				}
-				// We return sucess here and set the new password for the next module:
+				/* Set the new password for the next module */
 				pam_set_item(pamh,PAM_AUTHTOK,newtoken);
 				return PAM_SUCCESS;
 			}
 		}else{
-			// Impossible to initialise curl:
+			/* Error initializing CURL */
+			/* We zeroout CHECK,GET,PAYLOAD,buf and temp */
+			memset(CHECK,0,36);
+			memset(GET,0,43);
+			memset(PAYLOAD,0,6);
+			memset(buf, 0x0, SHA_DIGEST_LENGTH*2);
+			memset(temp, 0x0, SHA_DIGEST_LENGTH);
+			/* Cleanup chunk */
 			cleanup(pamh,chunk.memory);
 			if(options.havebeenpwned_debug)
 				pam_syslog(pamh,LOG_ERR,"[HAVEIBEENPWNED: curl initialisation error]");
 			pam_set_item(pamh, PAM_AUTHTOK, NULL);
 			return PAM_AUTHTOK_ERR;
 		} return PAM_AUTHTOK_ERR;
-	}else 
-		// Do nothing here, just return success:
-		return PAM_SUCCESS;
+	}else return PAM_SUCCESS;	/* first call to this module do nothing */
 }
